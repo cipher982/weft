@@ -576,6 +576,150 @@ def test_cross_agent_setup():
 
 
 # ============================================================================
+# CLI Tests
+# ============================================================================
+
+
+@pytest.mark.e2e
+def test_cli_version():
+    """Test agent-mesh version command."""
+    result = subprocess.run(
+        ["uv", "run", "agent-mesh", "version"],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        cwd=Path(__file__).parent.parent,
+    )
+    assert result.returncode == 0
+    assert "agent-mesh" in result.stdout
+    assert "0.1.0" in result.stdout
+
+
+@pytest.mark.e2e
+def test_cli_help():
+    """Test agent-mesh --help command."""
+    result = subprocess.run(
+        ["uv", "run", "agent-mesh", "--help"],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        cwd=Path(__file__).parent.parent,
+    )
+    assert result.returncode == 0
+    assert "run" in result.stdout
+    assert "pipeline" in result.stdout
+    assert "version" in result.stdout
+
+
+@pytest.mark.e2e
+@pytest.mark.slow
+@pytest.mark.skipif(not has_claude_cli(), reason="claude CLI not available")
+def test_cli_run_claude(temp_git_repo):
+    """Test agent-mesh run --agent claude command."""
+    result = subprocess.run(
+        [
+            "uv", "run", "agent-mesh", "run",
+            "--agent", "claude",
+            "--prompt", "Reply with exactly: CLI_TEST_PASSED",
+            "--timeout", "60",
+            "--cwd", str(temp_git_repo),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=90,
+        cwd=Path(__file__).parent.parent,
+    )
+    assert result.returncode == 0
+
+    # Should output valid JSON
+    data = json.loads(result.stdout)
+    assert data["agent"] == "claude"
+    assert "ok" in data
+
+
+# ============================================================================
+# Workspace Tests
+# ============================================================================
+
+
+@pytest.mark.e2e
+@pytest.mark.asyncio
+async def test_workspace_git_diff_untracked(temp_git_repo):
+    """Test capture_git_diff includes untracked files."""
+    from agent_mesh.workspace import capture_git_diff
+
+    # Create an untracked file
+    (Path(temp_git_repo) / "new_file.py").write_text("print('hello')\n")
+
+    diff = await capture_git_diff(temp_git_repo, include_untracked=True)
+
+    assert "new_file.py" in diff
+    assert "+print('hello')" in diff
+
+
+@pytest.mark.e2e
+@pytest.mark.asyncio
+async def test_workspace_git_diff_no_untracked(temp_git_repo):
+    """Test capture_git_diff without untracked files."""
+    from agent_mesh.workspace import capture_git_diff
+
+    # Create an untracked file
+    (Path(temp_git_repo) / "new_file.py").write_text("print('hello')\n")
+
+    diff = await capture_git_diff(temp_git_repo, include_untracked=False)
+
+    # Untracked file should NOT be in diff
+    assert "new_file.py" not in diff
+
+
+@pytest.mark.e2e
+@pytest.mark.asyncio
+async def test_workspace_git_diff_staged_changes(temp_git_repo):
+    """Test capture_git_diff with staged changes."""
+    from agent_mesh.workspace import capture_git_diff
+
+    # Modify and stage a file
+    readme = Path(temp_git_repo) / "README.md"
+    readme.write_text("# Test Repo\n\nModified content.\n")
+    subprocess.run(["git", "add", "README.md"], cwd=temp_git_repo, check=True)
+
+    diff = await capture_git_diff(temp_git_repo)
+
+    assert "README.md" in diff
+    assert "+Modified content" in diff
+
+
+@pytest.mark.e2e
+@pytest.mark.asyncio
+async def test_workspace_git_status(temp_git_repo):
+    """Test capture_git_status returns porcelain output."""
+    from agent_mesh.workspace import capture_git_status
+
+    # Create an untracked file
+    (Path(temp_git_repo) / "new_file.py").write_text("print('hello')\n")
+
+    status = await capture_git_status(temp_git_repo)
+
+    assert "?? new_file.py" in status
+
+
+@pytest.mark.e2e
+@pytest.mark.asyncio
+async def test_workspace_non_git_directory():
+    """Test workspace functions handle non-git directories."""
+    from agent_mesh.workspace import capture_git_diff, capture_git_status
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # Not a git repo
+        diff = await capture_git_diff(tmpdir)
+        assert diff == ""
+
+        # Status might return error or empty
+        status = await capture_git_status(tmpdir)
+        # Just verify it doesn't crash
+
+
+# ============================================================================
 # Test Summary
 # ============================================================================
 
@@ -598,6 +742,16 @@ def test_e2e_summary():
     print("  - codex_exec tool call with real API")
     print("\n✓ Pipeline Tests:")
     print("  - Review pipeline (Claude → git diff → Codex)")
+    print("\n✓ CLI Tests:")
+    print("  - agent-mesh version")
+    print("  - agent-mesh --help")
+    print("  - agent-mesh run --agent claude")
+    print("\n✓ Workspace Tests:")
+    print("  - capture_git_diff with untracked files")
+    print("  - capture_git_diff without untracked files")
+    print("  - capture_git_diff with staged changes")
+    print("  - capture_git_status")
+    print("  - Non-git directory handling")
     print("\n✓ Cross-Agent Tests:")
     print("  - MCP registration verification")
     print("  - Note: Full agent-to-agent requires manual MCP setup")
