@@ -15,6 +15,18 @@ Build a Python package "agent-mesh" (package name: `agent_mesh`) that enables he
 
 ---
 
+## Prerequisites
+
+Each CLI must be installed and authenticated:
+
+| CLI | Install | Auth |
+|-----|---------|------|
+| Claude Code | `npm install -g @anthropic-ai/claude-code` | `claude auth` (browser OAuth) |
+| Codex | `npm install -g @openai/codex` | `OPENAI_API_KEY` env var |
+| Gemini | `npm install -g @anthropic-ai/gemini-cli` | `GEMINI_API_KEY` env var |
+
+---
+
 ## Decision Log
 
 ### Decision: Package name `agent_mesh` with CLI command `agent-mesh`
@@ -102,7 +114,7 @@ All runners return this normalized structure:
 - [x] Create this spec document
 - [x] Commit spec
 
-### Phase 1: Skeleton + Contracts (Milestone 0)
+### Phase 1: Skeleton + Contracts (Milestone 0) ✓
 **Goal:** Working package structure with schema definitions
 
 **Deliverables:**
@@ -112,9 +124,9 @@ All runners return this normalized structure:
 - Basic CLI that responds to `agent-mesh version` and `--help`
 
 **Acceptance criteria:**
-- [ ] `uv run agent-mesh version` outputs version string
-- [ ] `uv run agent-mesh --help` shows available commands
-- [ ] Unit test validates AgentResult schema serialization
+- [x] `uv run agent-mesh version` outputs version string
+- [x] `uv run agent-mesh --help` shows available commands
+- [x] Unit test validates AgentResult schema serialization
 
 **Test commands:**
 ```bash
@@ -123,22 +135,22 @@ uv run agent-mesh --help
 uv run pytest tests/test_types.py -v
 ```
 
-### Phase 2: Headless Runners (Milestone 1)
+### Phase 2: Headless Runners (Milestone 1) ✓
 **Goal:** Implement subprocess runners for all three CLIs
 
 **Deliverables:**
 - Base runner with timeout, capture, async subprocess
 - Claude runner: `claude -p "..." --output-format json`
 - Codex runner: `codex exec --json "..."`
-- Gemini runner: `gemini -p "..."`
+- Gemini runner: `gemini --output-format json "..."`
 - CLI command: `agent-mesh run --agent {claude|codex|gemini} --prompt "..."`
 
 **Acceptance criteria:**
-- [ ] `agent-mesh run --agent claude --prompt "Say hello"` returns JSON
-- [ ] `agent-mesh run --agent codex --prompt "List files"` returns JSON
-- [ ] `agent-mesh run --agent gemini --prompt "Say hello"` returns JSON
-- [ ] All commands exit cleanly (no zombie processes)
-- [ ] Timeout handling works (kills subprocess after limit)
+- [x] `agent-mesh run --agent claude --prompt "Say hello"` returns JSON
+- [x] `agent-mesh run --agent codex --prompt "List files"` returns JSON
+- [x] `agent-mesh run --agent gemini --prompt "Say hello"` returns JSON (requires GEMINI_API_KEY)
+- [x] All commands exit cleanly (no zombie processes)
+- [x] Timeout handling works (kills subprocess after limit)
 
 **Test commands:**
 ```bash
