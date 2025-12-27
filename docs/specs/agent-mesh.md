@@ -178,7 +178,7 @@ uv run agent-mesh run --agent gemini --prompt "Say 'test passed'" --timeout 30
 uv run agent-mesh pipeline review --prompt "Add a hello.py file" --cwd /tmp/test-repo
 ```
 
-### Phase 4: MCP Server (Milestone 3)
+### Phase 4: MCP Server (Milestone 3) ✓
 **Goal:** Expose runners as MCP tools
 
 **Deliverables:**
@@ -187,15 +187,15 @@ uv run agent-mesh pipeline review --prompt "Add a hello.py file" --cwd /tmp/test
 - Registration documentation
 
 **Acceptance criteria:**
-- [ ] `python -m agent_mesh.mcp_server` starts and responds to MCP protocol
-- [ ] Tools discoverable via `tools/list`
-- [ ] Tool calls return AgentResult JSON
-- [ ] No non-MCP output to stdout
+- [x] `python -m agent_mesh.mcp_server` starts and responds to MCP protocol
+- [x] Tools discoverable via `tools/list`
+- [x] Tool calls return AgentResult JSON
+- [x] No non-MCP output to stdout
 
 **Test commands:**
 ```bash
-# Test MCP server starts
-echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test"}}}' | uv run python -m agent_mesh.mcp_server
+# Run comprehensive MCP server tests
+uv run python tests/test_mcp_server.py
 
 # Register in Codex and test
 codex mcp add agent-mesh -- uv run python -m agent_mesh.mcp_server
