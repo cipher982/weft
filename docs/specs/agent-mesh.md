@@ -47,6 +47,12 @@ Each CLI must be installed and authenticated:
 **Rationale:** Better timeout handling, future streaming support
 **Revisit if:** Complexity outweighs benefits
 
+### Decision: Bash scripts for demos with comprehensive error handling
+**Context:** Need demos that work without manual intervention
+**Choice:** Bash scripts with prerequisite checks, trap handlers for cleanup, and verbose output
+**Rationale:** Self-contained, easy to read, guaranteed cleanup via traps
+**Revisit if:** Need cross-platform support (consider Python scripts)
+
 ---
 
 ## Architecture
