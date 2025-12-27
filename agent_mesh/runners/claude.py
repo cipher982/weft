@@ -7,8 +7,20 @@ from agent_mesh.runners.base import run_subprocess
 from agent_mesh.types import AgentResult, Artifacts, Usage
 
 
-async def run_claude(prompt: str, cwd: str, timeout_s: int = 120) -> AgentResult:
-    """Run Claude Code CLI in print mode with JSON output."""
+async def run_claude(
+    prompt: str,
+    cwd: str,
+    timeout_s: int = 120,
+    auto_approve: bool = False,
+) -> AgentResult:
+    """Run Claude Code CLI in print mode with JSON output.
+
+    Args:
+        prompt: The prompt to send to Claude
+        cwd: Working directory
+        timeout_s: Timeout in seconds
+        auto_approve: If True, bypass permission checks (use with caution)
+    """
     cmd = [
         "claude",
         "-p",
@@ -16,6 +28,9 @@ async def run_claude(prompt: str, cwd: str, timeout_s: int = 120) -> AgentResult
         "--output-format",
         "json",
     ]
+
+    if auto_approve:
+        cmd.append("--dangerously-skip-permissions")
 
     exit_code, stdout, stderr, started_at, ended_at = await run_subprocess(
         cmd, cwd, timeout_s

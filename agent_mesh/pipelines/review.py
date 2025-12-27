@@ -3,14 +3,20 @@
 import json
 
 
-async def run_review_pipeline(prompt: str, cwd: str) -> str:
-    """Run the review pipeline: Claude implements, Codex reviews."""
+async def run_review_pipeline(prompt: str, cwd: str, auto_approve: bool = True) -> str:
+    """Run the review pipeline: Claude implements, Codex reviews.
+
+    Args:
+        prompt: What to implement
+        cwd: Working directory (should be a git repo)
+        auto_approve: If True, auto-approve Claude's file writes (default True for pipeline)
+    """
     from agent_mesh.runners.claude import run_claude
     from agent_mesh.runners.codex import run_codex
     from agent_mesh.workspace import capture_git_diff
 
-    # Step 1: Claude implements
-    claude_result = await run_claude(prompt, cwd)
+    # Step 1: Claude implements (auto-approve enabled for pipeline use)
+    claude_result = await run_claude(prompt, cwd, auto_approve=auto_approve)
     if not claude_result.ok:
         return json.dumps({
             "stage": "implementation",
