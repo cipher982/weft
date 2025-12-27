@@ -201,7 +201,7 @@ uv run python tests/test_mcp_server.py
 codex mcp add agent-mesh -- uv run python -m agent_mesh.mcp_server
 ```
 
-### Phase 5: Integration & Demos (Milestone 4)
+### Phase 5: Integration & Demos (Milestone 4) ✓
 **Goal:** Validate agent-to-agent interoperability
 
 **Deliverables:**
@@ -210,9 +210,19 @@ codex mcp add agent-mesh -- uv run python -m agent_mesh.mcp_server
 - End-to-end test with clean teardown
 
 **Acceptance criteria:**
-- [ ] Demo scripts complete without manual intervention
-- [ ] No lingering processes after demos
-- [ ] README with usage examples
+- [x] Demo scripts complete without manual intervention
+- [x] No lingering processes after demos
+- [x] README with usage examples
+
+**Test commands:**
+```bash
+# Run demos
+./demos/codex_calls_claude.sh
+./demos/claude_calls_codex.sh
+
+# Verify demos directory structure
+ls -la demos/
+```
 
 ---
 
