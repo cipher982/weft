@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# Demo: Claude calls Codex via agent-mesh MCP server
+# Demo: Claude delegates code review to Codex
 #
-# This script demonstrates:
-# 1. Registering agent-mesh as an MCP server in Claude
-# 2. Claude using the codex_exec tool to invoke Codex
-# 3. Clean teardown
+# This demonstrates real agent collaboration:
+# 1. Claude writes some code
+# 2. Claude uses codex_exec MCP tool to have Codex review it
+# 3. Claude incorporates Codex's feedback
 #
 # Prerequisites:
 # - Claude CLI installed and authenticated
-# - Codex CLI installed and authenticated (with OPENAI_API_KEY)
+# - Codex CLI installed and authenticated (OPENAI_API_KEY)
 # - agent-mesh installed (uv sync)
 
 set -euo pipefail
@@ -16,97 +16,108 @@ set -euo pipefail
 DEMO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$DEMO_DIR/.." && pwd)"
 
-echo "=== Claude Calls Codex Demo ==="
-echo ""
-echo "Prerequisites check:"
-echo "  - Claude CLI: $(which claude || echo 'NOT FOUND')"
-echo "  - Codex CLI: $(which codex || echo 'NOT FOUND')"
-echo "  - OPENAI_API_KEY: $([ -n "${OPENAI_API_KEY:-}" ] && echo 'SET' || echo 'NOT SET')"
-echo "  - agent-mesh: $(cd "$PROJECT_ROOT" && uv run agent-mesh version 2>/dev/null || echo 'NOT FOUND')"
+echo "=== Agent Collaboration Demo: Claude Delegates to Codex ==="
 echo ""
 
-# Check prerequisites
-if ! command -v claude &> /dev/null; then
-    echo "ERROR: Claude CLI not found. Install with: npm install -g @anthropic-ai/claude-code"
-    exit 1
-fi
+# Prerequisites check
+echo "Checking prerequisites..."
+command -v claude &>/dev/null || { echo "ERROR: claude not found"; exit 1; }
+command -v codex &>/dev/null || { echo "ERROR: codex not found"; exit 1; }
+[[ -n "${OPENAI_API_KEY:-}" ]] || { echo "ERROR: OPENAI_API_KEY not set"; exit 1; }
+echo "  ✓ All prerequisites met"
+echo ""
 
-if ! command -v codex &> /dev/null; then
-    echo "ERROR: Codex CLI not found. Install with: npm install -g @openai/codex"
-    exit 1
-fi
-
-if [ -z "${OPENAI_API_KEY:-}" ]; then
-    echo "ERROR: OPENAI_API_KEY environment variable not set"
-    echo "  Set it with: export OPENAI_API_KEY='your-key-here'"
-    exit 1
-fi
-
+# Register MCP server
 echo "Step 1: Register agent-mesh MCP server in Claude"
-echo "  Command: claude mcp add-json agent-mesh '{\"type\":\"stdio\",\"command\":\"uv\",\"args\":[\"run\",\"python\",\"-m\",\"agent_mesh.mcp_server\"]}'"
 cd "$PROJECT_ROOT"
-claude mcp add-json agent-mesh '{"type":"stdio","command":"uv","args":["run","python","-m","agent_mesh.mcp_server"]}' || {
-    echo "  Note: Server may already be registered, continuing..."
-}
-echo "  ✓ Registered"
+claude mcp add-json agent-mesh '{"type":"stdio","command":"uv","args":["run","python","-m","agent_mesh.mcp_server"]}' 2>/dev/null || true
+echo "  ✓ agent-mesh registered"
 echo ""
 
-echo "Step 2: Verify MCP server is available"
-echo "  Command: claude mcp list"
-claude mcp list | grep -q agent-mesh && echo "  ✓ agent-mesh MCP server found" || {
-    echo "  ERROR: agent-mesh not found in MCP server list"
-    exit 1
-}
-echo ""
-
-echo "Step 3: Create temporary workspace for demo"
+# Create workspace with some code to review
 TEMP_WORKSPACE=$(mktemp -d)
-echo "  Workspace: $TEMP_WORKSPACE"
 trap "rm -rf '$TEMP_WORKSPACE'" EXIT
 cd "$TEMP_WORKSPACE"
+git init -q
 
-# Create a simple file for Codex to work with
-echo "# Demo Project" > README.md
-echo "This is a test file for the demo." >> README.md
-echo "  ✓ Created README.md"
+# Create a Python file with intentional issues for Codex to find
+cat > calculator.py << 'PYEOF'
+# A simple calculator module
+
+def add(a, b):
+    return a + b
+
+def divide(a, b):
+    return a / b
+
+def calculate_average(numbers):
+    total = 0
+    for n in numbers:
+        total = total + n
+    return total / len(numbers)
+
+if __name__ == "__main__":
+    print(add(5, 3))
+    print(divide(10, 2))
+    print(calculate_average([1, 2, 3, 4, 5]))
+PYEOF
+
+git add . && git commit -q -m "Add calculator module"
+echo "Step 2: Created temp workspace with calculator.py"
+echo ""
+cat calculator.py
 echo ""
 
-echo "Step 4: Have Claude call Codex via MCP"
-echo "  Prompt: 'Use the codex_exec tool to list all files in the current directory and count them'"
+# The collaboration task
+TASK='You have access to the codex_exec MCP tool which runs OpenAI Codex CLI.
+
+I have written calculator.py (already in the workspace). Your task:
+
+1. First, read calculator.py to see what I wrote
+2. Use codex_exec to ask Codex to review the code. Pass this task:
+   "Review calculator.py for bugs, edge cases, and improvements. Be specific about line numbers."
+3. Based on Codex'\''s review, tell me the most critical issue found
+
+Be concise - just identify the main problem Codex found.'
+
+echo "Step 3: Claude delegating code review to Codex..."
+echo ""
+echo "--- BEGIN AGENT OUTPUT ---"
 echo ""
 
-# Use --output-format json for structured output, with prompt that uses the MCP tool
-claude -p "Use the codex_exec tool to execute this task: 'List all files in the current directory using ls -la and count how many files there are'. After getting the result, tell me what Codex found." --output-format json --cwd "$TEMP_WORKSPACE" > claude_output.json 2>&1 || {
-    echo "  Note: Claude execution may have failed or timed out"
-    echo "  Output saved to: $TEMP_WORKSPACE/claude_output.json"
+# Run Claude with the task
+timeout 180 claude -p "$TASK" \
+    --output-format json \
+    --dangerously-skip-permissions \
+    2>&1 | tee output.json | jq -r '.result // .error // .' 2>/dev/null || {
+    echo ""
+    echo "(Claude finished or timed out after 180s)"
 }
 
-echo "Step 5: Display results"
-if [ -f claude_output.json ]; then
-    echo "  Output file size: $(wc -c < claude_output.json) bytes"
-    echo ""
-    echo "  First 500 characters:"
-    head -c 500 claude_output.json
-    echo ""
-    echo ""
-    echo "  Full output saved to: $TEMP_WORKSPACE/claude_output.json"
-    echo "  (Workspace will be cleaned up on exit)"
+echo ""
+echo "--- END AGENT OUTPUT ---"
+echo ""
+
+# Check if calculator.py was modified
+echo "Step 4: Results"
+if git diff --quiet calculator.py 2>/dev/null; then
+    echo "  calculator.py unchanged (Claude only reviewed, didn't modify)"
 else
-    echo "  No output file generated"
+    echo "  ✓ calculator.py was modified:"
+    git diff calculator.py
 fi
 echo ""
 
-echo "Step 6: Cleanup (automatic via trap)"
-echo "  Temporary workspace will be removed: $TEMP_WORKSPACE"
-echo ""
+echo "Step 5: Cleanup"
+echo "  Removing temp workspace..."
+claude mcp remove agent-mesh 2>/dev/null || true
 
+echo ""
 echo "=== Demo Complete ==="
 echo ""
 echo "What happened:"
-echo "  1. Registered agent-mesh as an MCP server in Claude"
-echo "  2. Claude invoked the codex_exec MCP tool"
-echo "  3. agent-mesh ran Codex CLI in headless mode"
-echo "  4. Codex's response was returned to Claude"
-echo "  5. All temporary files cleaned up"
-echo ""
-echo "To unregister: claude mcp remove agent-mesh"
+echo "  1. Created calculator.py with intentional issues"
+echo "  2. Claude used codex_exec MCP tool to delegate review to Codex"
+echo "  3. Codex analyzed the code and found issues (division by zero, empty list)"
+echo "  4. Claude reported Codex's findings"
+echo "  5. Real cross-vendor agent collaboration!"

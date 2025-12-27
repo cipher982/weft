@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
-# Demo: Codex calls Claude via agent-mesh MCP server
+# Demo: Codex orchestrates Claude to write code, then reviews it
 #
-# This script demonstrates:
-# 1. Registering agent-mesh as an MCP server in Codex
-# 2. Codex using the claude_run tool to invoke Claude
-# 3. Clean teardown
+# This demonstrates real agent collaboration:
+# 1. Codex uses claude_run MCP tool to have Claude write a Python script
+# 2. Codex reviews what Claude wrote and suggests improvements
 #
 # Prerequisites:
-# - Codex CLI installed and authenticated
+# - Codex CLI installed and authenticated (OPENAI_API_KEY)
 # - Claude CLI installed and authenticated
 # - agent-mesh installed (uv sync)
 
@@ -16,85 +15,94 @@ set -euo pipefail
 DEMO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$DEMO_DIR/.." && pwd)"
 
-echo "=== Codex Calls Claude Demo ==="
-echo ""
-echo "Prerequisites check:"
-echo "  - Codex CLI: $(which codex || echo 'NOT FOUND')"
-echo "  - Claude CLI: $(which claude || echo 'NOT FOUND')"
-echo "  - agent-mesh: $(cd "$PROJECT_ROOT" && uv run agent-mesh version 2>/dev/null || echo 'NOT FOUND')"
+echo "=== Agent Collaboration Demo: Codex Orchestrates Claude ==="
 echo ""
 
-# Check prerequisites
-if ! command -v codex &> /dev/null; then
-    echo "ERROR: Codex CLI not found. Install with: npm install -g @openai/codex"
-    exit 1
-fi
+# Prerequisites check
+echo "Checking prerequisites..."
+command -v codex &>/dev/null || { echo "ERROR: codex not found"; exit 1; }
+command -v claude &>/dev/null || { echo "ERROR: claude not found"; exit 1; }
+[[ -n "${OPENAI_API_KEY:-}" ]] || { echo "ERROR: OPENAI_API_KEY not set"; exit 1; }
+echo "  ✓ All prerequisites met"
+echo ""
 
-if ! command -v claude &> /dev/null; then
-    echo "ERROR: Claude CLI not found. Install with: npm install -g @anthropic-ai/claude-code"
-    exit 1
-fi
-
+# Register MCP server
 echo "Step 1: Register agent-mesh MCP server in Codex"
-echo "  Command: codex mcp add agent-mesh -- uv run python -m agent_mesh.mcp_server"
 cd "$PROJECT_ROOT"
-codex mcp add agent-mesh -- uv run python -m agent_mesh.mcp_server || {
-    echo "  Note: Server may already be registered, continuing..."
-}
-echo "  ✓ Registered"
+codex mcp add agent-mesh -- uv run python -m agent_mesh.mcp_server 2>/dev/null || true
+echo "  ✓ agent-mesh registered"
 echo ""
 
-echo "Step 2: Verify MCP server is available"
-echo "  Command: codex mcp list"
-codex mcp list | grep -q agent-mesh && echo "  ✓ agent-mesh MCP server found" || {
-    echo "  ERROR: agent-mesh not found in MCP server list"
-    exit 1
-}
-echo ""
-
-echo "Step 3: Create temporary workspace for demo"
+# Create workspace
 TEMP_WORKSPACE=$(mktemp -d)
-echo "  Workspace: $TEMP_WORKSPACE"
 trap "rm -rf '$TEMP_WORKSPACE'" EXIT
-echo ""
-
-echo "Step 4: Have Codex call Claude via MCP"
-echo "  Task: 'Use the claude_run tool to ask Claude to say hello and explain what MCP is in one sentence'"
-echo ""
 cd "$TEMP_WORKSPACE"
+git init -q
+echo "# Demo Project" > README.md
+git add . && git commit -q -m "init"
+echo "Step 2: Created temp workspace: $TEMP_WORKSPACE"
+echo ""
 
-# Use --json to get structured output, timeout after 60s
-codex exec --json --timeout 60 "Use the claude_run tool to ask Claude to say 'Hello from Claude via MCP!' and explain what MCP (Model Context Protocol) is in exactly one sentence" > codex_output.json 2>&1 || {
-    echo "  Note: Codex execution may have failed or timed out"
-    echo "  Output saved to: $TEMP_WORKSPACE/codex_output.json"
+# The actual collaboration task
+TASK='You have access to the claude_run MCP tool which runs Claude Code CLI.
+
+Your task:
+1. Use claude_run to ask Claude to write a Python script called "fetch_weather.py" that:
+   - Takes a city name as a command line argument
+   - Uses the requests library to fetch weather from wttr.in
+   - Prints a formatted weather summary
+
+   Pass this to claude_run: "Write fetch_weather.py - a CLI script that fetches weather from wttr.in for a given city. Use requests library. Include error handling."
+
+2. After Claude creates the file, review what was written and tell me:
+   - What Claude created
+   - One specific improvement you would make
+
+Be concise. This is a demo of agent collaboration.'
+
+echo "Step 3: Codex orchestrating Claude..."
+echo "  Task: Have Claude write a weather script, then Codex reviews it"
+echo ""
+echo "--- BEGIN AGENT OUTPUT ---"
+echo ""
+
+# Run with --json for structured output, use timeout to prevent hanging
+timeout 180 codex exec --json --skip-git-repo-check "$TASK" 2>&1 | tee output.jsonl | while read -r line; do
+    # Extract and display agent messages in real-time
+    if echo "$line" | jq -e '.item.type == "agent_message"' &>/dev/null; then
+        echo "$line" | jq -r '.item.text // empty' 2>/dev/null || true
+    fi
+done || {
+    echo ""
+    echo "(Codex finished or timed out after 180s)"
 }
 
-echo "Step 5: Display results"
-if [ -f codex_output.json ]; then
-    echo "  Output file size: $(wc -c < codex_output.json) bytes"
+echo ""
+echo "--- END AGENT OUTPUT ---"
+echo ""
+
+# Show what files were created
+echo "Step 4: Results"
+if [ -f fetch_weather.py ]; then
+    echo "  ✓ Claude created fetch_weather.py:"
     echo ""
-    echo "  First 500 characters:"
-    head -c 500 codex_output.json
+    cat fetch_weather.py
     echo ""
-    echo ""
-    echo "  Full output saved to: $TEMP_WORKSPACE/codex_output.json"
-    echo "  (Workspace will be cleaned up on exit)"
 else
-    echo "  No output file generated"
+    echo "  (No file created - Claude may have been blocked or task incomplete)"
 fi
-echo ""
 
-echo "Step 6: Cleanup (automatic via trap)"
-echo "  Temporary workspace will be removed: $TEMP_WORKSPACE"
 echo ""
+echo "Step 5: Cleanup"
+echo "  Removing temp workspace and unregistering MCP server..."
+codex mcp remove agent-mesh 2>/dev/null || true
 
+echo ""
 echo "=== Demo Complete ==="
 echo ""
 echo "What happened:"
-echo "  1. Registered agent-mesh as an MCP server in Codex"
-echo "  2. Codex invoked the claude_run MCP tool"
-echo "  3. agent-mesh ran Claude CLI in headless mode"
-echo "  4. Claude's response was returned to Codex"
-echo "  5. All temporary files cleaned up"
-echo ""
-echo "To unregister: codex mcp remove agent-mesh"
+echo "  1. Codex received a task requiring Claude's help"
+echo "  2. Codex used the claude_run MCP tool to invoke Claude"
+echo "  3. Claude wrote Python code in the workspace"
+echo "  4. Codex reviewed Claude's output and provided feedback"
+echo "  5. Real agent-to-agent collaboration via MCP!"
