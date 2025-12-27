@@ -66,8 +66,8 @@ echo ""
 echo "--- BEGIN AGENT OUTPUT ---"
 echo ""
 
-# Run with --json for structured output, use timeout to prevent hanging
-timeout 180 codex exec --json --skip-git-repo-check "$TASK" 2>&1 | tee output.jsonl | while read -r line; do
+# Run with --json for structured output, --full-auto for tool access
+timeout 180 codex exec --json --full-auto "$TASK" 2>&1 | tee output.jsonl | while read -r line; do
     # Extract and display agent messages in real-time
     if echo "$line" | jq -e '.item.type == "agent_message"' &>/dev/null; then
         echo "$line" | jq -r '.item.text // empty' 2>/dev/null || true

@@ -6,11 +6,27 @@ from agent_mesh.runners.base import run_subprocess
 from agent_mesh.types import AgentResult, Usage
 
 
-async def run_codex(task: str, cwd: str, timeout_s: int = 120, json_events: bool = True) -> AgentResult:
-    """Run Codex CLI exec in headless mode."""
-    cmd = ["codex", "exec"]
+async def run_codex(
+    task: str,
+    cwd: str,
+    timeout_s: int = 120,
+    json_events: bool = True,
+    full_auto: bool = True,
+) -> AgentResult:
+    """Run Codex CLI exec in headless mode.
+
+    Args:
+        task: The task to execute
+        cwd: Working directory
+        timeout_s: Timeout in seconds
+        json_events: If True, output JSONL events
+        full_auto: If True, enable auto-approval and workspace write
+    """
+    cmd = ["codex", "exec", "--skip-git-repo-check"]
     if json_events:
         cmd.append("--json")
+    if full_auto:
+        cmd.append("--full-auto")
     cmd.append(task)
 
     exit_code, stdout, stderr, started_at, ended_at = await run_subprocess(
