@@ -27,10 +27,10 @@ command -v codex &>/dev/null || { echo "ERROR: codex not found"; exit 1; }
 echo "  ✓ All prerequisites met"
 echo ""
 
-# Register MCP server
+# Register MCP server with absolute Python path (works from any directory)
 echo "Step 1: Register agent-mesh MCP server in Claude"
-cd "$PROJECT_ROOT"
-claude mcp add-json agent-mesh '{"type":"stdio","command":"uv","args":["run","python","-m","agent_mesh.mcp_server"]}' 2>/dev/null || true
+VENV_PYTHON="$PROJECT_ROOT/.venv/bin/python3"
+claude mcp add-json agent-mesh "{\"type\":\"stdio\",\"command\":\"$VENV_PYTHON\",\"args\":[\"-m\",\"agent_mesh.mcp_server\"]}" --scope user 2>/dev/null || true
 echo "  ✓ agent-mesh registered"
 echo ""
 
@@ -110,7 +110,8 @@ echo ""
 
 echo "Step 5: Cleanup"
 echo "  Removing temp workspace..."
-claude mcp remove agent-mesh 2>/dev/null || true
+# Note: Keep agent-mesh MCP server registered for future use
+# To unregister: claude mcp remove agent-mesh
 
 echo ""
 echo "=== Demo Complete ==="
