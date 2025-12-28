@@ -64,8 +64,16 @@ def check_binaries() -> dict[str, BinaryCheck]:
     # Add lightweight env warnings (not hard failures)
     if checks["codex"].ok and not os.environ.get("OPENAI_API_KEY"):
         checks["codex"] = replace(checks["codex"], warning="OPENAI_API_KEY is not set (Codex calls may fail)")
-    if checks["gemini"].ok and not os.environ.get("GEMINI_API_KEY"):
-        checks["gemini"] = replace(checks["gemini"], warning="GEMINI_API_KEY is not set (Gemini calls may fail)")
+
+    # Bedrock hint (only if user is trying to use Bedrock)
+    if os.environ.get("CLAUDE_CODE_USE_BEDROCK") == "1" and checks["claude"].ok:
+        aws_profile = os.environ.get("AWS_PROFILE")
+        aws_region = os.environ.get("AWS_REGION")
+        if not aws_profile or not aws_region:
+            checks["claude"] = replace(
+                checks["claude"],
+                warning="CLAUDE_CODE_USE_BEDROCK=1 but AWS_PROFILE/AWS_REGION not fully set (Claude calls may fail)",
+            )
 
     return checks
 
