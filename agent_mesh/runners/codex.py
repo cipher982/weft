@@ -69,10 +69,11 @@ async def run_codex(
                     pass
         structured = {"events": events}
 
-        # Extract final message if present
+        # Extract final message if present (Codex uses item.type == "agent_message")
         for event in reversed(events):
-            if event.get("type") == "message" and event.get("message"):
-                structured["response"] = event["message"]
+            item = event.get("item", {})
+            if item.get("type") == "agent_message" and item.get("completed"):
+                structured["response"] = item.get("text", "")
                 break
 
     return AgentResult(
