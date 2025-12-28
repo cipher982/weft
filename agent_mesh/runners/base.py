@@ -13,7 +13,10 @@ async def run_subprocess(
     timeout_s: int,
     env: dict[str, str] | None = None,
 ) -> tuple[int, str, str, datetime, datetime]:
-    """Run a subprocess with timeout and capture output."""
+    """Run a subprocess with timeout and capture output.
+
+    Always returns a tuple, even on errors (FileNotFoundError, permission errors, etc).
+    """
     import os
 
     full_env = os.environ.copy()
@@ -22,14 +25,27 @@ async def run_subprocess(
 
     started_at = datetime.now(timezone.utc)
 
-    proc = await asyncio.create_subprocess_exec(
-        *cmd,
-        cwd=cwd,
-        stdin=asyncio.subprocess.DEVNULL,  # Close stdin to avoid MCP stdio conflicts
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-        env=full_env,
-    )
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            cwd=cwd,
+            stdin=asyncio.subprocess.DEVNULL,  # Close stdin to avoid MCP stdio conflicts
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env=full_env,
+        )
+    except FileNotFoundError as e:
+        ended_at = datetime.now(timezone.utc)
+        return 127, "", f"Command not found: {cmd[0]} ({e})", started_at, ended_at
+    except PermissionError as e:
+        ended_at = datetime.now(timezone.utc)
+        return 126, "", f"Permission denied: {e}", started_at, ended_at
+    except NotADirectoryError as e:
+        ended_at = datetime.now(timezone.utc)
+        return 1, "", f"Invalid working directory: {cwd} ({e})", started_at, ended_at
+    except Exception as e:
+        ended_at = datetime.now(timezone.utc)
+        return 1, "", f"Failed to start subprocess: {e}", started_at, ended_at
 
     try:
         stdout_bytes, stderr_bytes = await asyncio.wait_for(
