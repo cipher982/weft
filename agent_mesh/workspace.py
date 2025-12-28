@@ -13,9 +13,15 @@ async def capture_git_diff(cwd: str, include_untracked: bool = True) -> str:
     """
     cwd_path = Path(cwd).resolve()
 
-    # Check if it's a git repo
-    git_dir = cwd_path / ".git"
-    if not git_dir.exists():
+    # Check if it's a git repo (works in subdirectories too)
+    proc = await asyncio.create_subprocess_exec(
+        "git", "rev-parse", "--is-inside-work-tree",
+        cwd=str(cwd_path),
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, _ = await proc.communicate()
+    if proc.returncode != 0 or stdout.decode().strip() != "true":
         return ""
 
     parts: list[str] = []
