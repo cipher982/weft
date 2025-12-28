@@ -1,11 +1,11 @@
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/logo-weft-dark.svg">
-  <img src="assets/logo-weft.svg" alt="weft" width="280">
+  <img src="assets/logo-weft.svg" alt="weft" width="400">
 </picture>
 
 **Your AI agents can now call each other.**
 
-<img src="assets/badge-agents.svg" alt="Claude Code + Codex + Gemini" width="260">
+<img src="assets/badge-agents.svg" alt="Claude Code + Codex + Gemini" width="340">
 
 <br><br>
 
