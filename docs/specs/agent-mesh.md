@@ -23,7 +23,7 @@ Each CLI must be installed and authenticated:
 |-----|---------|------|
 | Claude Code | `npm install -g @anthropic-ai/claude-code` | `claude auth` (browser OAuth) |
 | Codex | `npm install -g @openai/codex` | `OPENAI_API_KEY` env var |
-| Gemini | `npm install -g @anthropic-ai/gemini-cli` | `GEMINI_API_KEY` env var |
+| Gemini | `npm install -g @google/gemini-cli` | `GEMINI_API_KEY` env var |
 
 ---
 
@@ -63,7 +63,6 @@ agent_mesh/
 ├── __main__.py          # CLI entrypoint (python -m agent_mesh)
 ├── cli.py               # Typer CLI app
 ├── types.py             # Pydantic models (AgentResult, RunConfig, etc.)
-├── normalize.py         # Output normalization
 ├── workspace.py         # Git diff capture, cwd handling
 ├── runners/
 │   ├── __init__.py

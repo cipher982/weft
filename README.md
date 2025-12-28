@@ -29,7 +29,7 @@ Each CLI must be installed and authenticated before use:
 |-----|---------|------|
 | Claude Code | `npm install -g @anthropic-ai/claude-code` | `claude auth` (browser OAuth) |
 | Codex | `npm install -g @openai/codex` | `export OPENAI_API_KEY='your-key'` |
-| Gemini | `npm install -g @anthropic-ai/gemini-cli` | `export GEMINI_API_KEY='your-key'` |
+| Gemini | `npm install -g @google/gemini-cli` | `export GEMINI_API_KEY='your-key'` |
 
 ## Usage
 

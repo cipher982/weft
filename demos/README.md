@@ -9,7 +9,7 @@ Before running any demos, ensure:
 1. **CLIs are installed and authenticated:**
    - Claude Code: `npm install -g @anthropic-ai/claude-code` then `claude auth`
    - Codex: `npm install -g @openai/codex` with `OPENAI_API_KEY` set
-   - Gemini: `npm install -g @anthropic-ai/gemini-cli` with `GEMINI_API_KEY` set
+   - Gemini: `npm install -g @google/gemini-cli` with `GEMINI_API_KEY` set
 
 2. **agent-mesh is installed:**
    ```bash
