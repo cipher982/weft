@@ -70,7 +70,7 @@ async def run_agent(agent: str, prompt: str, cwd: str = ".", timeout_s: int = 12
         # Return error result for unknown agent
         now = datetime.now(timezone.utc)
         return AgentResult(
-            agent="claude",  # type: ignore
+            agent="unknown",
             cwd=cwd,
             ok=False,
             exit_code=1,
