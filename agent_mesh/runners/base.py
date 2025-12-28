@@ -68,8 +68,12 @@ async def run_subprocess(
     )
 
 
-async def run_agent(agent: str, prompt: str, cwd: str = ".", timeout_s: int = 120) -> AgentResult:
-    """Dispatch to the appropriate agent runner."""
+async def run_agent(agent: str, prompt: str, cwd: str = ".", timeout_s: int = 1800) -> AgentResult:
+    """Dispatch to the appropriate agent runner.
+
+    Note: These run full agentic workflows (not single LLM calls).
+    Default 30min timeout accounts for tool use, retries, and I/O.
+    """
     # Resolve cwd to absolute path
     cwd = str(Path(cwd).resolve())
 

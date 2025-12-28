@@ -48,6 +48,11 @@ class RunConfig(BaseModel):
 
     prompt: str
     cwd: str = Field(default=".")
-    timeout_s: int = Field(default=120, ge=1, le=3600)
+    timeout_s: int = Field(
+        default=1800,
+        ge=1,
+        le=7200,
+        description="Timeout in seconds (default 1800=30min). Accounts for full agentic workflows including tool use, retries, and I/O.",
+    )
     output_format: Literal["json", "text"] = "json"
     env: dict[str, str] = Field(default_factory=dict)

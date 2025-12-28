@@ -66,7 +66,7 @@ def test_run_config_defaults():
     """Test RunConfig default values."""
     config = RunConfig(prompt="test")
     assert config.cwd == "."
-    assert config.timeout_s == 120
+    assert config.timeout_s == 1800  # 30 minutes default for agentic workflows
     assert config.output_format == "json"
     assert config.env == {}
 
@@ -81,7 +81,7 @@ def test_run_config_validation():
     with pytest.raises(ValueError):
         RunConfig(prompt="test", timeout_s=0)
 
-    # Invalid timeout (too high)
+    # Invalid timeout (too high - max is 7200 = 2 hours)
     with pytest.raises(ValueError):
         RunConfig(prompt="test", timeout_s=10000)
 

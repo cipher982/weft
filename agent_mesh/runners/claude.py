@@ -11,7 +11,7 @@ from agent_mesh.types import AgentResult, Artifacts, Usage
 async def run_claude(
     prompt: str,
     cwd: str,
-    timeout_s: int = 120,
+    timeout_s: int = 1800,
     auto_approve: bool = True,
     model: str | None = None,
     use_bedrock: bool | None = None,
@@ -20,10 +20,13 @@ async def run_claude(
 ) -> AgentResult:
     """Run Claude Code CLI in print mode with JSON output.
 
+    This runs a full agentic workflow (not a single LLM call), which includes
+    tool use, retries, and I/O. The default 30min timeout accounts for this.
+
     Args:
         prompt: The prompt to send to Claude
         cwd: Working directory
-        timeout_s: Timeout in seconds
+        timeout_s: Timeout in seconds (default 1800=30min for full agentic workflow)
         auto_approve: If True, bypass permission checks (default True for headless)
         model: Model to use (defaults to env ANTHROPIC_MODEL)
         use_bedrock: Use Bedrock (defaults to env CLAUDE_CODE_USE_BEDROCK)
@@ -75,11 +78,17 @@ async def run_claude(
     # Parse structured output if possible
     structured: dict = {}
     usage = Usage()
+    is_error = False
 
     if stdout.strip():
         try:
             data = json.loads(stdout)
-            structured = data
+            # Only keep the essential fields, not full conversation/tool history
+            if "result" in data:
+                structured["result"] = data["result"]
+            if "is_error" in data:
+                structured["is_error"] = data["is_error"]
+                is_error = data["is_error"]
             # Extract usage if present
             if "usage" in data:
                 usage = Usage(
@@ -87,21 +96,30 @@ async def run_claude(
                     output_tokens=data["usage"].get("output_tokens"),
                     cached_input_tokens=data["usage"].get("cache_read_input_tokens"),
                 )
-            # Check for is_error in result
-            if data.get("is_error"):
-                exit_code = 1
+                structured["usage"] = data["usage"]
         except json.JSONDecodeError:
-            structured = {"raw_output": stdout}
+            # Truncate raw output if it's huge
+            max_raw = 2000
+            raw = stdout[:max_raw]
+            if len(stdout) > max_raw:
+                raw += f"\n... [truncated {len(stdout) - max_raw} chars]"
+            structured = {"raw_output": raw}
+
+    # Truncate stdout to avoid context blowup
+    max_stdout = 2000
+    truncated_stdout = stdout[:max_stdout]
+    if len(stdout) > max_stdout:
+        truncated_stdout += f"\n... [truncated {len(stdout) - max_stdout} chars]"
 
     return AgentResult(
         agent="claude",
         cwd=cwd,
-        ok=exit_code == 0 and not structured.get("is_error", False),
+        ok=exit_code == 0 and not is_error,
         exit_code=exit_code,
         started_at=started_at,
         ended_at=ended_at,
         duration_ms=duration_ms,
-        stdout=stdout,
+        stdout=truncated_stdout,
         stderr=stderr,
         structured=structured,
         usage=usage,

@@ -13,7 +13,7 @@ ReasoningEffort = Literal["none", "low", "medium", "high", "xhigh"]
 async def run_codex(
     task: str,
     cwd: str,
-    timeout_s: int = 120,
+    timeout_s: int = 1800,
     json_events: bool = True,
     model: str = "gpt-5.2",
     reasoning_effort: ReasoningEffort = "low",
@@ -21,10 +21,13 @@ async def run_codex(
 ) -> AgentResult:
     """Run Codex CLI exec in headless mode.
 
+    This runs a full agentic workflow (not a single LLM call), which includes
+    tool use, retries, and I/O. The default 30min timeout accounts for this.
+
     Args:
         task: The task to execute
         cwd: Working directory
-        timeout_s: Timeout in seconds
+        timeout_s: Timeout in seconds (default 1800=30min for full agentic workflow)
         json_events: If True, output JSONL events
         model: Model to use (default: gpt-5.2)
         reasoning_effort: Reasoning effort level (none/low/medium/high/xhigh)
@@ -63,25 +66,34 @@ async def run_codex(
 
     # Parse JSONL events if json mode
     structured: dict = {}
-    events: list = []
+    response_text: str | None = None
+    event_count = 0
 
     if json_events and stdout.strip():
         for line in stdout.strip().split("\n"):
             if line.strip():
                 try:
-                    events.append(json.loads(line))
+                    event = json.loads(line)
+                    event_count += 1
+                    # Extract final agent message
+                    # Codex emits: {"type":"item.completed","item":{"type":"agent_message","text":"..."}}
+                    if event.get("type") == "item.completed":
+                        item = event.get("item", {})
+                        if item.get("type") == "agent_message" and "text" in item:
+                            response_text = item["text"]
                 except json.JSONDecodeError:
                     pass
-        structured = {"events": events}
 
-        # Extract final agent message from JSONL events
-        # Codex emits: {"type":"item.completed","item":{"type":"agent_message","text":"..."}}
-        for event in reversed(events):
-            if event.get("type") == "item.completed":
-                item = event.get("item", {})
-                if item.get("type") == "agent_message" and "text" in item:
-                    structured["response"] = item["text"]
-                    break
+        # Only keep the response, not the full event log (can be 60k+ tokens)
+        if response_text:
+            structured["response"] = response_text
+        structured["event_count"] = event_count
+
+    # Truncate stdout to avoid context blowup (test output can be huge)
+    max_stdout = 2000
+    truncated_stdout = stdout[:max_stdout]
+    if len(stdout) > max_stdout:
+        truncated_stdout += f"\n... [truncated {len(stdout) - max_stdout} chars]"
 
     return AgentResult(
         agent="codex",
@@ -91,7 +103,7 @@ async def run_codex(
         started_at=started_at,
         ended_at=ended_at,
         duration_ms=duration_ms,
-        stdout=stdout,
+        stdout=truncated_stdout,
         stderr=stderr,
         structured=structured,
     )
