@@ -69,12 +69,14 @@ async def run_codex(
                     pass
         structured = {"events": events}
 
-        # Extract final message if present (Codex uses item.type == "agent_message")
+        # Extract final agent message from JSONL events
+        # Codex emits: {"type":"item.completed","item":{"type":"agent_message","text":"..."}}
         for event in reversed(events):
-            item = event.get("item", {})
-            if item.get("type") == "agent_message" and item.get("completed"):
-                structured["response"] = item.get("text", "")
-                break
+            if event.get("type") == "item.completed":
+                item = event.get("item", {})
+                if item.get("type") == "agent_message" and "text" in item:
+                    structured["response"] = item["text"]
+                    break
 
     return AgentResult(
         agent="codex",
