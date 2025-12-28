@@ -115,7 +115,7 @@ All runners return this normalized structure:
 ## Implementation Phases
 
 ### Phase 0: Validate & Spec ✓
-- [x] Read requirements from guide.md
+- [x] Define requirements
 - [x] Create this spec document
 - [x] Commit spec
 
