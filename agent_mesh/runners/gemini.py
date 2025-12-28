@@ -25,11 +25,15 @@ async def run_gemini(prompt: str, cwd: str, timeout_s: int = 120) -> AgentResult
     # Gemini outputs JSON in headless mode
     structured: dict = {}
     usage = Usage()
+    has_error = False
 
     if exit_code == 0 and stdout.strip():
         try:
             data = json.loads(stdout)
             structured = data
+            # Check if response contains an error field
+            if "error" in data:
+                has_error = True
             # Extract usage stats if present
             if "stats" in data:
                 usage = Usage(
@@ -43,7 +47,7 @@ async def run_gemini(prompt: str, cwd: str, timeout_s: int = 120) -> AgentResult
     return AgentResult(
         agent="gemini",
         cwd=cwd,
-        ok=exit_code == 0,
+        ok=(exit_code == 0 and not has_error),
         exit_code=exit_code,
         started_at=started_at,
         ended_at=ended_at,
