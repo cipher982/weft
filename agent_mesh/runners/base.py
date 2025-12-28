@@ -25,6 +25,7 @@ async def run_subprocess(
     proc = await asyncio.create_subprocess_exec(
         *cmd,
         cwd=cwd,
+        stdin=asyncio.subprocess.DEVNULL,  # Close stdin to avoid MCP stdio conflicts
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         env=full_env,
