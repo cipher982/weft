@@ -1,98 +1,82 @@
-# weft
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/logo-weft-dark.svg">
+  <img src="assets/logo-weft.svg" alt="weft" width="280">
+</picture>
 
-Tiny MCP tool server that exposes Claude Code, Codex CLI, and Gemini CLI as callable tools.
+**Your AI agents can now call each other.**
 
-## Quickstart
+<img src="assets/badge-agents.svg" alt="Claude Code + Codex + Gemini" width="260">
+
+<br><br>
+
+<img src="assets/diagram-flow.svg" alt="Architecture diagram" width="500">
+
+An MCP server that lets Claude Code, Codex CLI, and Gemini CLI invoke each other as tools. No glue scripts. No copy-paste. Just agents collaborating.
+
+## Why?
+
+Each CLI agent has strengths. Sometimes you want Claude to implement, Codex to review, and Gemini to sanity-check. Weft makes that one tool call away.
+
+## Quick Start
 
 ```bash
+# Install
+git clone https://github.com/cipher982/weft && cd weft
 uv sync
-uv run agent-mesh doctor   # no LLM calls; checks MCP + binaries
-uv run agent-mesh smoke    # real calls (costs money)
+
+# Verify setup (no API calls)
+uv run agent-mesh doctor
+
+# Test it works (costs money)
+uv run agent-mesh smoke
 ```
 
-## What this repo is for
+## Register the MCP Server
 
-- Make the three CLIs usable headlessly (no interactive sessions).
-- Provide an MCP server (`python -m agent_mesh.mcp_server`) that exposes:
-  - `claude_run`
-  - `codex_exec`
-  - `gemini_run`
+Pick your agent and register weft:
 
-## Prereqs
-
-Install the CLIs:
-
-```bash
-npm install -g @anthropic-ai/claude-code
-npm install -g @openai/codex
-npm install -g @google/gemini-cli
-```
-
-Auth/env:
-
-- Claude: `claude auth` (browser OAuth)
-- Codex: `OPENAI_API_KEY=...`
-- Gemini: `GEMINI_API_KEY=...` (or whatever auth your installed `gemini` CLI is configured for)
-
-## MCP Server
-
-```bash
-uv run python -m agent_mesh.mcp_server
-```
-
-## Register in each CLI
-
-Codex:
-
-```bash
-codex mcp add agent-mesh -- uv run python -m agent_mesh.mcp_server
-codex mcp list
-```
-
-Claude:
-
+**Claude Code:**
 ```bash
 claude mcp add-json agent-mesh '{"type":"stdio","command":"uv","args":["run","python","-m","agent_mesh.mcp_server"]}'
-claude mcp list
 ```
 
-Gemini: configure an MCP stdio server entry pointing at `uv run python -m agent_mesh.mcp_server` (exact location/schema depends on your gemini-cli version).
+**Codex:**
+```bash
+codex mcp add agent-mesh -- uv run python -m agent_mesh.mcp_server
+```
 
-## Notes
+**Gemini:** Add to `~/.gemini/settings.json`:
+```json
+{
+  "mcpServers": {
+    "agent-mesh": {
+      "command": "uv",
+      "args": ["run", "python", "-m", "agent_mesh.mcp_server"]
+    }
+  }
+}
+```
 
-- `agent-mesh smoke` makes real model calls and costs money.
-- `agent-mesh pipeline review` exists as an example/recipe, not the core product.
+Now your agent has three new tools: `claude_run`, `codex_exec`, `gemini_run`.
+
+## Prerequisites
+
+Install the CLIs you want to use:
+
+```bash
+npm install -g @anthropic-ai/claude-code  # then: claude auth
+npm install -g @openai/codex               # needs: OPENAI_API_KEY
+npm install -g @google/gemini-cli          # needs: GEMINI_API_KEY
+```
 
 ## Troubleshooting
 
-### "Command not found"
-Ensure CLIs are installed and in PATH:
-```bash
-which claude
-which codex
-which gemini
-```
-
-### "Authentication failed"
-Run the appropriate auth command:
-```bash
-claude auth                          # OAuth browser flow
-export OPENAI_API_KEY='your-key'    # For Codex
-export GEMINI_API_KEY='your-key'    # For Gemini
-```
-
-### "MCP server not found"
-After registering, restart the agent CLI to load the new MCP server configuration.
-
-### Timeouts
-Increase timeout for long-running tasks:
-```bash
-agent-mesh run --agent claude --prompt "Complex task" --timeout 300
-```
-
-## Contributing
-
-See `docs/specs/agent-mesh.md` for the full specification and implementation phases.
+| Problem | Fix |
+|---------|-----|
+| "Command not found" | `which claude codex gemini` - install missing CLIs |
+| "Auth failed" | Run `claude auth` or set API key env vars |
+| "MCP server not found" | Restart your agent CLI after registering |
+| Timeouts | Add `--timeout 300` for long tasks |
 
 ## License
 
