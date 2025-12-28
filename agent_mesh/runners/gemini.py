@@ -9,8 +9,10 @@ from agent_mesh.types import AgentResult, Usage
 async def run_gemini(prompt: str, cwd: str, timeout_s: int = 120) -> AgentResult:
     """Run Gemini CLI in headless mode."""
     # Gemini CLI uses positional prompt and --output-format for JSON
+    # --yolo auto-approves shell commands (required for headless execution)
     cmd = [
         "gemini",
+        "--yolo",
         "--output-format",
         "json",
         prompt,

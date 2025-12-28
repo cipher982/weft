@@ -38,6 +38,7 @@ async def run_codex(
         "-m", model,
         "-c", f"model_reasoning_effort={reasoning_effort}",
         "--dangerously-bypass-approvals-and-sandbox",
+        "--skip-git-repo-check",
     ]
 
     if web_search:
