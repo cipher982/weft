@@ -1,6 +1,7 @@
 """Claude Code CLI runner."""
 
 import json
+import os
 from datetime import timezone
 
 from agent_mesh.runners.base import run_subprocess
@@ -11,7 +12,11 @@ async def run_claude(
     prompt: str,
     cwd: str,
     timeout_s: int = 120,
-    auto_approve: bool = False,
+    auto_approve: bool = True,
+    model: str | None = None,
+    use_bedrock: bool | None = None,
+    aws_profile: str | None = None,
+    aws_region: str | None = None,
 ) -> AgentResult:
     """Run Claude Code CLI in print mode with JSON output.
 
@@ -19,7 +24,18 @@ async def run_claude(
         prompt: The prompt to send to Claude
         cwd: Working directory
         timeout_s: Timeout in seconds
-        auto_approve: If True, bypass permission checks (use with caution)
+        auto_approve: If True, bypass permission checks (default True for headless)
+        model: Model to use (defaults to env ANTHROPIC_MODEL)
+        use_bedrock: Use Bedrock (defaults to env CLAUDE_CODE_USE_BEDROCK)
+        aws_profile: AWS profile for Bedrock
+        aws_region: AWS region for Bedrock
+
+    Environment variables respected:
+        CLAUDE_CODE_USE_BEDROCK: Set to "1" for Bedrock
+        ANTHROPIC_MODEL: Model ID (e.g., us.anthropic.claude-sonnet-4-5-20250929-v1:0)
+        ANTHROPIC_DEFAULT_HAIKU_MODEL: Haiku model for subtasks
+        AWS_PROFILE: AWS profile for Bedrock auth
+        AWS_REGION: AWS region for Bedrock
     """
     cmd = [
         "claude",
@@ -32,8 +48,26 @@ async def run_claude(
     if auto_approve:
         cmd.append("--dangerously-skip-permissions")
 
+    # Build environment - inherit from parent and add overrides
+    env: dict[str, str] = {}
+
+    # Bedrock configuration
+    if use_bedrock or os.environ.get("CLAUDE_CODE_USE_BEDROCK") == "1":
+        env["CLAUDE_CODE_USE_BEDROCK"] = "1"
+        env["AWS_PROFILE"] = aws_profile or os.environ.get("AWS_PROFILE", "")
+        env["AWS_REGION"] = aws_region or os.environ.get("AWS_REGION", "us-east-1")
+
+    # Model selection
+    if model:
+        env["ANTHROPIC_MODEL"] = model
+
+    # Pass through other relevant env vars
+    for key in ["ANTHROPIC_MODEL", "ANTHROPIC_DEFAULT_HAIKU_MODEL", "ANTHROPIC_DEFAULT_SONNET_MODEL"]:
+        if key in os.environ and key not in env:
+            env[key] = os.environ[key]
+
     exit_code, stdout, stderr, started_at, ended_at = await run_subprocess(
-        cmd, cwd, timeout_s
+        cmd, cwd, timeout_s, env=env if env else None
     )
 
     duration_ms = int((ended_at - started_at).total_seconds() * 1000)
@@ -42,7 +76,7 @@ async def run_claude(
     structured: dict = {}
     usage = Usage()
 
-    if exit_code == 0 and stdout.strip():
+    if stdout.strip():
         try:
             data = json.loads(stdout)
             structured = data
@@ -53,13 +87,16 @@ async def run_claude(
                     output_tokens=data["usage"].get("output_tokens"),
                     cached_input_tokens=data["usage"].get("cache_read_input_tokens"),
                 )
+            # Check for is_error in result
+            if data.get("is_error"):
+                exit_code = 1
         except json.JSONDecodeError:
             structured = {"raw_output": stdout}
 
     return AgentResult(
         agent="claude",
         cwd=cwd,
-        ok=exit_code == 0,
+        ok=exit_code == 0 and not structured.get("is_error", False),
         exit_code=exit_code,
         started_at=started_at,
         ended_at=ended_at,

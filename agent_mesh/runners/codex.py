@@ -1,9 +1,13 @@
 """Codex CLI runner."""
 
 import json
+import os
+from typing import Literal
 
 from agent_mesh.runners.base import run_subprocess
 from agent_mesh.types import AgentResult, Usage
+
+ReasoningEffort = Literal["none", "low", "medium", "high", "xhigh"]
 
 
 async def run_codex(
@@ -11,7 +15,9 @@ async def run_codex(
     cwd: str,
     timeout_s: int = 120,
     json_events: bool = True,
-    full_auto: bool = True,
+    model: str = "gpt-5.2",
+    reasoning_effort: ReasoningEffort = "low",
+    web_search: bool = True,
 ) -> AgentResult:
     """Run Codex CLI exec in headless mode.
 
@@ -20,13 +26,28 @@ async def run_codex(
         cwd: Working directory
         timeout_s: Timeout in seconds
         json_events: If True, output JSONL events
-        full_auto: If True, enable auto-approval and workspace write
+        model: Model to use (default: gpt-5.2)
+        reasoning_effort: Reasoning effort level (none/low/medium/high/xhigh)
+        web_search: Enable web search capability
+
+    Environment variables respected:
+        OPENAI_API_KEY: Required for Codex API access
     """
-    cmd = ["codex", "exec", "--skip-git-repo-check"]
+    cmd = [
+        "codex",
+        "-m", model,
+        "-c", f"model_reasoning_effort={reasoning_effort}",
+        "--dangerously-bypass-approvals-and-sandbox",
+    ]
+
+    if web_search:
+        cmd.extend(["--enable", "web_search_request"])
+
+    cmd.append("exec")
+
     if json_events:
         cmd.append("--json")
-    if full_auto:
-        cmd.append("--full-auto")
+
     cmd.append(task)
 
     exit_code, stdout, stderr, started_at, ended_at = await run_subprocess(

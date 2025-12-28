@@ -2,7 +2,7 @@
 
 import asyncio
 import sys
-from typing import Annotated
+from typing import Annotated, Literal
 
 from mcp.server.fastmcp import FastMCP
 
@@ -18,12 +18,12 @@ async def claude_run(
     prompt: Annotated[str, "The prompt to send to Claude"],
     cwd: Annotated[str, "Working directory"] = ".",
     timeout_s: Annotated[int, "Timeout in seconds"] = 120,
-    auto_approve: Annotated[bool, "Auto-approve file writes"] = False,
+    model: Annotated[str | None, "Model ID (e.g., us.anthropic.claude-sonnet-4-5-20250929-v1:0)"] = None,
 ) -> str:
-    """Run Claude Code CLI in headless mode and return structured JSON result."""
+    """Run Claude Code CLI in headless mode. Uses Bedrock if CLAUDE_CODE_USE_BEDROCK=1."""
     from agent_mesh.runners.claude import run_claude
 
-    result = await run_claude(prompt, cwd, timeout_s, auto_approve)
+    result = await run_claude(prompt, cwd, timeout_s, auto_approve=True, model=model)
     return result.model_dump_json(indent=2)
 
 
@@ -32,12 +32,16 @@ async def codex_exec(
     task: Annotated[str, "The task to execute"],
     cwd: Annotated[str, "Working directory"] = ".",
     timeout_s: Annotated[int, "Timeout in seconds"] = 120,
-    json_events: Annotated[bool, "Return JSONL events"] = True,
+    reasoning_effort: Annotated[str, "Reasoning effort: none, low, medium, high, xhigh"] = "low",
 ) -> str:
-    """Run Codex CLI exec in headless mode and return structured JSON result."""
+    """Run Codex CLI (gpt-5.2) in headless mode. Use higher reasoning_effort for complex tasks."""
     from agent_mesh.runners.codex import run_codex
 
-    result = await run_codex(task, cwd, timeout_s, json_events)
+    result = await run_codex(
+        task, cwd, timeout_s,
+        json_events=True,
+        reasoning_effort=reasoning_effort,  # type: ignore
+    )
     return result.model_dump_json(indent=2)
 
 
@@ -47,7 +51,7 @@ async def gemini_run(
     cwd: Annotated[str, "Working directory"] = ".",
     timeout_s: Annotated[int, "Timeout in seconds"] = 120,
 ) -> str:
-    """Run Gemini CLI in headless mode and return structured JSON result."""
+    """Run Gemini CLI in headless mode. Requires GEMINI_API_KEY."""
     from agent_mesh.runners.gemini import run_gemini
 
     result = await run_gemini(prompt, cwd, timeout_s)
