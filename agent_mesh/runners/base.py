@@ -16,6 +16,7 @@ async def run_subprocess(
     """Run a subprocess with timeout and capture output.
 
     Always returns a tuple, even on errors (FileNotFoundError, permission errors, etc).
+    On timeout, returns partial output captured so far rather than losing everything.
     """
     import os
 
@@ -47,22 +48,40 @@ async def run_subprocess(
         ended_at = datetime.now(timezone.utc)
         return 1, "", f"Failed to start subprocess: {e}", started_at, ended_at
 
+    # Stream output into buffers so we can return partial results on timeout
+    stdout_chunks: list[bytes] = []
+    stderr_chunks: list[bytes] = []
+
+    async def read_stream(stream: asyncio.StreamReader, chunks: list[bytes]) -> None:
+        while True:
+            chunk = await stream.read(8192)
+            if not chunk:
+                break
+            chunks.append(chunk)
+
     try:
-        stdout_bytes, stderr_bytes = await asyncio.wait_for(
-            proc.communicate(),
+        await asyncio.wait_for(
+            asyncio.gather(
+                read_stream(proc.stdout, stdout_chunks),
+                read_stream(proc.stderr, stderr_chunks),
+                proc.wait(),
+            ),
             timeout=timeout_s,
         )
     except asyncio.TimeoutError:
         proc.kill()
         await proc.wait()
         ended_at = datetime.now(timezone.utc)
-        return -1, "", f"Timeout after {timeout_s}s", started_at, ended_at
+        stdout = b"".join(stdout_chunks).decode("utf-8", errors="replace")
+        stderr = b"".join(stderr_chunks).decode("utf-8", errors="replace")
+        timeout_msg = f"\n\n[TIMEOUT after {timeout_s}s - partial output above]"
+        return -1, stdout, stderr + timeout_msg, started_at, ended_at
 
     ended_at = datetime.now(timezone.utc)
     return (
         proc.returncode or 0,
-        stdout_bytes.decode("utf-8", errors="replace"),
-        stderr_bytes.decode("utf-8", errors="replace"),
+        b"".join(stdout_chunks).decode("utf-8", errors="replace"),
+        b"".join(stderr_chunks).decode("utf-8", errors="replace"),
         started_at,
         ended_at,
     )
