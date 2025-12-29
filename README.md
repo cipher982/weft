@@ -80,7 +80,6 @@ npm install -g @google/gemini-cli          # needs: GEMINI_API_KEY
 | Command not found | `which claude codex gemini` - install missing CLIs |
 | Auth failed | Run `claude auth` or set API key env vars |
 | MCP server not found | Restart your agent CLI after registering |
-| Timeouts | Add `--timeout 300` for long tasks |
 
 ## License
 

@@ -90,7 +90,7 @@ claude mcp remove agent-mesh
 ```
 
 ### Timeouts
-Demos use 60s timeouts by default. If your first request takes longer (cold start), you may see timeout messages. This is expected and won't affect the demo's educational value.
+Agent tasks have a 30-minute timeout. If tasks take longer, partial output is preserved and returned.
 
 ## Cleanup
 
