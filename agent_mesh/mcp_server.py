@@ -15,11 +15,11 @@ mcp = FastMCP(
 
 @mcp.tool()
 async def claude_run(
-    prompt: Annotated[str, "The prompt to send to Claude"],
+    prompt: Annotated[str, "The task or prompt. Include project context (audience, principles like YAGNI, what NOT to do) to avoid enterprise-pattern defaults"],
     cwd: Annotated[str, "Working directory"] = ".",
     model: Annotated[str | None, "Model ID (e.g., us.anthropic.claude-sonnet-4-5-20250929-v1:0)"] = None,
 ) -> str:
-    """Run Claude Code CLI in headless mode. This executes a full agentic workflow (not a single LLM call), including tool use, retries, and I/O. Default 30min timeout. Uses Bedrock if CLAUDE_CODE_USE_BEDROCK=1."""
+    """Run Claude Code CLI in headless mode. Full agentic workflow with tool use. Default 30min timeout. Uses Bedrock if CLAUDE_CODE_USE_BEDROCK=1."""
     from agent_mesh.runners.claude import run_claude
 
     result = await run_claude(prompt, cwd, 1800, auto_approve=True, model=model)
@@ -27,12 +27,12 @@ async def claude_run(
 
 
 @mcp.tool()
-async def codex_exec(
-    task: Annotated[str, "The task to execute"],
+async def codex_run(
+    task: Annotated[str, "The task. Include project context (audience, principles like YAGNI, what NOT to do) to avoid enterprise-pattern defaults"],
     cwd: Annotated[str, "Working directory"] = ".",
-    reasoning_effort: Annotated[str, "Reasoning effort: none, low, medium, high, xhigh"] = "low",
+    reasoning_effort: Annotated[str, "Reasoning effort: low, medium, high"] = "low",
 ) -> str:
-    """Run Codex CLI (gpt-5.2) in headless mode. This executes a full agentic workflow (not a single LLM call), including tool use, retries, and I/O. Default 30min timeout. Use higher reasoning_effort for complex tasks."""
+    """Run Codex CLI (gpt-5.2) in headless mode. Full agentic workflow with tool use. Default 30min timeout. Use higher reasoning_effort for complex tasks."""
     from agent_mesh.runners.codex import run_codex
 
     result = await run_codex(
@@ -45,10 +45,10 @@ async def codex_exec(
 
 @mcp.tool()
 async def gemini_run(
-    prompt: Annotated[str, "The prompt to send to Gemini"],
+    prompt: Annotated[str, "The task or prompt. Include project context (audience, principles like YAGNI, what NOT to do) to avoid enterprise-pattern defaults"],
     cwd: Annotated[str, "Working directory"] = ".",
 ) -> str:
-    """Run Gemini CLI in headless mode. This executes a full agentic workflow (not a single LLM call), including tool use, retries, and I/O. Default 30min timeout. Requires GEMINI_API_KEY."""
+    """Run Gemini CLI in headless mode. Full agentic workflow with tool use. Default 30min timeout. Requires GEMINI_API_KEY."""
     from agent_mesh.runners.gemini import run_gemini
 
     result = await run_gemini(prompt, cwd, 1800)
